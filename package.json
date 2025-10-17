@@ -1,0 +1,24 @@
+{
+  "name": "maps-scraper-pro",
+  "version": "2.0.0",
+  "description": "Sistema completo de scraping do Google Maps",
+  "scripts": {
+    "install-all": "npm run install-backend && npm run install-frontend",
+    "install-backend": "cd backend && npm install",
+    "install-frontend": "cd frontend && npm install",
+    "backend": "cd backend && node server.js",
+    "backend-dev": "cd backend && npx nodemon server.js",
+    "frontend": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm run backend-dev\" \"npm run frontend\"",
+    "start": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "clean": "rm -rf backend/node_modules frontend/node_modules backend/package-lock.json frontend/package-lock.json",
+    "reinstall": "npm run clean && npm run install-all"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.0.1"
+  },
+  "keywords": ["scraping", "google-maps", "leads", "automation"],
+  "author": "APsolutions",
+  "license": "MIT"
+}

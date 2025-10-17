@@ -446,7 +446,7 @@ export default function App() {
         </div>
 
         <footer className="text-center py-8 text-gray-400 text-sm">
-          <p>Desenvolvido por APsolutions • Maps Scraper Pro v2.1</p>
+          <p>Desenvolvido por APsolutions • Maps Scraper Pro</p>
         </footer>
       </div>
     </div>

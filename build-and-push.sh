@@ -17,7 +17,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║   Maps Scraper Pro - Build Script     ║${NC}"
+echo -e "${BLUE}║   Maps Scraper Pro - Build Script      ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
 
 # Verificar se está na raiz do projeto
