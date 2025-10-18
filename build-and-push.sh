@@ -47,8 +47,6 @@ echo -e "${BLUE}═════════════════════�
 
 docker build \
   --no-cache \
-  --progress=plain \
-  -t ${IMAGE_NAME}:${VERSION} \
   .
 
 if [ $? -ne 0 ]; then
@@ -92,7 +90,7 @@ fi
 
 # 4. Resumo
 echo -e "\n${GREEN}╔════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║         ✅ BUILD CONCLUÍDO!            ║${NC}"
+echo -e "${GREEN}║         ✅ BUILD CONCLUÍDO!           ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════╝${NC}\n"
 
 echo -e "${BLUE}📦 Imagens criadas:${NC}"

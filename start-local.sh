@@ -114,7 +114,7 @@ sleep 3
 
 # Resumo final
 echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║     ✅ APLICAÇÃO INICIADA!            ║${NC}"
+echo -e "${GREEN}║       ✅ APLICAÇÃO INICIADA!          ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════╝${NC}\n"
 
 echo -e "${BLUE}📊 Status:${NC}"
