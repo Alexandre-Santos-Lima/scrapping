@@ -26,19 +26,32 @@ Certifique-se de que seu projeto tenha essa estrutura:
 ```
 maps-scraper-pro/
 ├── backend/
+│   ├── package-lock.json
 │   ├── package.json
+│   ├── config.js
+│   ├── routes.js
+│   ├── scraper.js
 │   └── server.js
 ├── frontend/
 │   ├── public/
 │   ├── src/
+│   │   ├──pages/
+│   │   │   ├── APIPage.jsx
+│   │   │   ├── DocsPage.jsx
+│   │   │   └── HomePage.jsx
 │   │   ├── App.jsx
 │   │   ├── main.jsx
 │   │   └── index.css
 │   ├── index.html
+│   ├── package-lock.json
 │   ├── package.json
 │   ├── vite.config.js
 │   ├── tailwind.config.js
 │   └── postcss.config.js
+├── start-local.bat
+├── start-local.sh
+├── stop-local.sh
+├── local-setup-guide.md
 └── README.md
 ```
 
@@ -115,7 +128,7 @@ node server.js
 **Saída esperada:**
 ```
 ╔════════════════════════════════════════╗
-║   Maps Scraper Pro - Backend v2.0     ║
+║   Maps Scraper Pro - Backend v2.0      ║
 ╚════════════════════════════════════════╝
 🚀 Servidor rodando na porta 3001
 📋 Profissões disponíveis: 20
@@ -141,28 +154,7 @@ VITE v5.x.x  ready in xxx ms
 
 ### **Opção 2: Usar Scripts Automatizados**
 
-Crie um arquivo `start-local.sh` na raiz do projeto:
-
-```bash
-#!/bin/bash
-
-echo "🚀 Iniciando Maps Scraper Pro..."
-
-# Terminal 1 - Backend
-gnome-terminal -- bash -c "cd backend && node server.js; exec bash" &
-
-# Aguardar backend iniciar
-sleep 3
-
-# Terminal 2 - Frontend
-gnome-terminal -- bash -c "cd frontend && npm run dev; exec bash" &
-
-echo "✅ Projeto iniciado!"
-echo "Backend: http://localhost:3001"
-echo "Frontend: http://localhost:5173"
-```
-
-Depois execute:
+Execute:
 ```bash
 chmod +x start-local.sh
 ./start-local.sh

@@ -105,6 +105,5 @@ curl -X POST http://localhost:3001/api/search \
 
 ### **Windows:**
 ```cmd
-stop-local.bat
-# ou feche as janelas do cmd
+Feche as janelas do cmd
 ```
