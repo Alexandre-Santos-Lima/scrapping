@@ -117,79 +117,18 @@ async function waitForResults(page) {
 }
 
 // =============================
-// SCROLL INTELIGENTE
+// EXTRAÇÃO ITEM POR ITEM (1 a 1)
 // =============================
-async function autoScrollLimited(page, maxResults) {
-  console.log('🐌 Modo LENTO ativado: Priorizando QUANTIDADE sobre velocidade');
+async function extractOneByOne(page, maxResults) {
+  console.log('🔄 Iniciando extração ITEM POR ITEM (1 a 1)...');
   
-  await page.evaluate(async (config) => {
-    const wrapper = document.querySelector('div[role="main"]');
-    if (!wrapper) {
-      console.log('⚠️  Wrapper não encontrado');
-      return;
-    }
-
-    await new Promise((resolve) => {
-      let totalHeight = 0;
-      let scrollAttempts = 0;
-      let lastItemCount = 0;
-      let stableCount = 0;
-      
-      const maxScrollAttempts = config.maxResults * config.multiplier;
-      
-      console.log(`🔄 Iniciando scroll AGRESSIVO... Meta: ${config.maxResults} resultados`);
-      console.log(`📊 Máximo de tentativas: ${maxScrollAttempts} scrolls`);
-      
-      const timer = setInterval(() => {
-        const scrollHeight = wrapper.scrollHeight;
-        wrapper.scrollBy(0, config.distance);
-        totalHeight += config.distance;
-        scrollAttempts++;
-
-        const currentItems = document.querySelectorAll('a[href*="/maps/place/"]').length;
-        
-        if (scrollAttempts % 5 === 0 || currentItems !== lastItemCount) {
-          console.log(`📜 Scroll ${scrollAttempts}/${maxScrollAttempts}: ${currentItems} itens | ${totalHeight}px`);
-        }
-        
-        if (currentItems === lastItemCount) {
-          stableCount++;
-        } else {
-          stableCount = 0;
-          lastItemCount = currentItems;
-        }
-        
-        if (currentItems >= config.maxResults * 2 || 
-            scrollAttempts >= maxScrollAttempts || 
-            stableCount >= config.stableLimit ||
-            totalHeight > config.maxHeight) {
-          
-          console.log(`✅ Scroll finalizado: ${currentItems} itens em ${scrollAttempts} scrolls (${totalHeight}px)`);
-          clearInterval(timer);
-          resolve();
-        }
-      }, config.interval);
-    });
-  }, {
-    maxResults: maxResults,
-    distance: CONFIG.SCROLL.DISTANCE,
-    interval: CONFIG.SCROLL.INTERVAL,
-    multiplier: CONFIG.SCROLL.MAX_ATTEMPTS_MULTIPLIER,
-    stableLimit: CONFIG.SCROLL.STABLE_COUNT_LIMIT,
-    maxHeight: CONFIG.SCROLL.MAX_HEIGHT
-  });
-
-  console.log(`⏳ Aguardando ${CONFIG.SCROLL.FINAL_WAIT / 1000}s para garantir renderização final...`);
-  await new Promise(resolve => setTimeout(resolve, CONFIG.SCROLL.FINAL_WAIT));
-  console.log('✅ Renderização final concluída!');
-}
-
-// =============================
-// EXTRAÇÃO DE DADOS
-// =============================
-async function extractDataFromPage(page, maxResults) {
-  return await page.evaluate((maxResults) => {
+  // Passar o timestamp de início para o evaluate
+  const startTimestamp = Date.now();
+  
+  return await page.evaluate(async (config) => {
+    const { maxResults, startTime } = config;
     
+    // Funções auxiliares dentro do contexto do navegador
     function extractWebsite(element) {
       const websiteButton = element.querySelector('a[data-item-id="authority"]');
       if (websiteButton && websiteButton.href) return websiteButton.href;
@@ -201,13 +140,6 @@ async function extractDataFromPage(page, maxResults) {
       const externalLink = Array.from(element.querySelectorAll('a[href^="http"]'))
         .find(a => !/google\.com|gstatic\.com|googleusercontent\.com/i.test(a.href || ''));
       if (externalLink && externalLink.href) return externalLink.href;
-
-      const urlRegex = /(https?:\/\/[^\s]+)/g;
-      const urls = (element.innerText || '').match(urlRegex);
-      if (urls && urls.length > 0) {
-        const validUrl = urls.find(url => !/google\.com/i.test(url));
-        if (validUrl) return validUrl;
-      }
 
       return null;
     }
@@ -246,104 +178,212 @@ async function extractDataFromPage(page, maxResults) {
         if (text.length > 5 && text.length < 200) return text;
       }
 
-      const addressRegex = /(?:Rua|Avenida|Av\.|R\.|Travessa|Alameda|Praça)[^,\n]{5,100}/i;
-      const match = (element.innerText || '').match(addressRegex);
-      if (match) return match[0].trim();
-
       return null;
     }
 
-    const items = [];
-    const placeLinks = Array.from(document.querySelectorAll('a[href*="/maps/place/"]'));
-    console.log(`🔍 Links encontrados: ${placeLinks.length}`);
-    
-    let elements = placeLinks
-      .map(link => {
-        let parent = link;
-        for (let i = 0; i < 6; i++) {
-          parent = parent.parentElement;
-          if (!parent) break;
-          const classes = parent.className || '';
-          if (classes.includes('Nv2PK') || classes.includes('THOPZb')) break;
-        }
-        return parent;
-      })
-      .filter(el => el !== null);
-    
-    console.log(`✅ Containers pai encontrados: ${elements.length}`);
-    
-    if (elements.length === 0) {
-      elements = Array.from(document.querySelectorAll('div.Nv2PK, div.THOPZb'));
-      console.log(`🔍 Fallback - containers diretos: ${elements.length}`);
-    }
-
-    const uniqueElements = [];
-    const seenTexts = new Set();
-    
-    elements.forEach(el => {
-      const text = (el.innerText || '').substring(0, 100);
-      if (!seenTexts.has(text) && text.length > 10) {
-        seenTexts.add(text);
-        uniqueElements.push(el);
-      }
-    });
-    
-    console.log(`✅ Elementos únicos: ${uniqueElements.length}`);
-
-    uniqueElements.slice(0, maxResults * 2).forEach((el, index) => {
+    function extractDataFromElement(element) {
       try {
         let name = null;
         
-        const nameEl1 = el.querySelector('div.qBF1Pd');
+        const nameEl1 = element.querySelector('div.qBF1Pd');
         if (nameEl1) name = nameEl1.innerText.trim();
         
         if (!name || name.length < 2) {
-          const linkEl = el.querySelector('a[href*="/maps/place/"]');
+          const linkEl = element.querySelector('a[href*="/maps/place/"]');
           if (linkEl) {
             const ariaLabel = linkEl.getAttribute('aria-label');
             if (ariaLabel) name = ariaLabel.trim();
           }
         }
         
-        if (!name || name.length < 2) {
-          const headingEl = el.querySelector('h3, h2, h1');
-          if (headingEl) name = headingEl.innerText.trim();
-        }
-        
-        if (!name || name.length < 2) {
-          const fontEl = el.querySelector('[class*="fontHeadline"]');
-          if (fontEl) name = fontEl.innerText.trim();
-        }
-        
-        if (!name || name.length < 2) return;
+        if (!name || name.length < 2) return null;
 
-        let phone = null;
-        const phoneEl = el.querySelector('span.UsdlK');
-        if (phoneEl) phone = phoneEl.innerText.trim();
-        if (!phone) phone = extractPhone(el);
-
-        const website = extractWebsite(el);
-        const address = extractAddress(el);
+        const phone = extractPhone(element);
+        const website = extractWebsite(element);
+        const address = extractAddress(element);
 
         let rating = null;
-        const ratingEl = el.querySelector('span.ZkP5Je[role="img"]');
+        const ratingEl = element.querySelector('span.ZkP5Je[role="img"]');
         if (ratingEl) rating = ratingEl.getAttribute('aria-label');
 
-        items.push({
+        return {
           nome: name,
           telefone: phone,
           website: website,
           endereco: address,
           avaliacao: rating
-        });
-
+        };
       } catch (err) {
-        console.error(`❌ Erro ao extrair item ${index}:`, err.message);
+        return null;
       }
-    });
+    }
 
-    return items.slice(0, maxResults);
-  }, maxResults);
+    function formatElapsedTime(ms) {
+      const seconds = Math.floor(ms / 1000);
+      if (seconds < 60) return `${seconds}s`;
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return `${minutes}m ${remainingSeconds}s`;
+    }
+
+    // =============================
+    // EXTRAÇÃO SEQUENCIAL 1 A 1
+    // =============================
+    const wrapper = document.querySelector('div[role="main"]');
+    if (!wrapper) {
+      console.log('⚠️  Wrapper principal não encontrado');
+      return { items: [], stats: { extracted: 0, scrolls: 0, processed: 0 } };
+    }
+
+    const savedItems = []; // Array final de itens salvos
+    const processedKeys = new Set(); // Controle de duplicatas
+    
+    let totalScrolls = 0;
+    let consecutiveNoNew = 0;
+    let processedCount = 0;
+    
+    const MAX_NO_NEW = 15; // Parar após 15 tentativas sem novos itens
+    const SCROLL_DISTANCE = 600;
+    const WAIT_AFTER_SCROLL = 2000;
+
+    console.log(`\n╔════════════════════════════════════════╗`);
+    console.log(`║  🎯 EXTRAÇÃO ITEM POR ITEM INICIADA   ║`);
+    console.log(`╚════════════════════════════════════════╝`);
+    console.log(`📊 Meta: ${maxResults} leads`);
+    console.log(`⏱️  Início: ${new Date().toLocaleTimeString()}`);
+    console.log(`═══════════════════════════════════════\n`);
+
+    while (savedItems.length < maxResults && consecutiveNoNew < MAX_NO_NEW) {
+      // Pegar TODOS os links visíveis na viewport atual
+      const allLinks = Array.from(document.querySelectorAll('a[href*="/maps/place/"]'));
+      
+      let foundNewInThisRound = false;
+
+      // Processar cada link individualmente
+      for (const link of allLinks) {
+        processedCount++;
+        
+        // Já atingiu o limite? Parar
+        if (savedItems.length >= maxResults) {
+          const elapsed = Date.now() - startTime;
+          console.log(`\n🎉 META ATINGIDA: ${savedItems.length} leads em ${formatElapsedTime(elapsed)}`);
+          break;
+        }
+
+        // Encontrar o container pai
+        let container = link;
+        for (let i = 0; i < 6; i++) {
+          container = container.parentElement;
+          if (!container) break;
+          const classes = container.className || '';
+          if (classes.includes('Nv2PK') || classes.includes('THOPZb')) break;
+        }
+
+        if (!container) continue;
+
+        // Extrair dados deste item específico
+        const data = extractDataFromElement(container);
+        if (!data || !data.nome) continue;
+
+        // Chave única para evitar duplicatas
+        const uniqueKey = `${data.nome}|${data.endereco || 'N/A'}`;
+
+        // Se já foi processado, pular
+        if (processedKeys.has(uniqueKey)) {
+          continue;
+        }
+
+        // ✅ SALVAR ITEM IMEDIATAMENTE NA "TABLE"
+        processedKeys.add(uniqueKey);
+        savedItems.push(data);
+        foundNewInThisRound = true;
+
+        // 📊 LOG DETALHADO DE CADA LEAD SALVO
+        const elapsed = Date.now() - startTime;
+        const hasContact = data.telefone || data.website;
+        const contactInfo = [];
+        if (data.telefone) contactInfo.push(`📞 ${data.telefone}`);
+        if (data.website) contactInfo.push(`🌐 Site`);
+        
+        console.log(`╔════════════════════════════════════════╗`);
+        console.log(`║ 💾 LEAD #${savedItems.length} SALVO NA TABLE`);
+        console.log(`╠════════════════════════════════════════╣`);
+        console.log(`║ 👤 Nome: ${data.nome.substring(0, 35)}`);
+        if (contactInfo.length > 0) {
+          console.log(`║ 📞 Contato: ${contactInfo.join(' | ')}`);
+        } else {
+          console.log(`║ ⚠️  Sem contato`);
+        }
+        console.log(`║ ⏱️  Tempo: ${formatElapsedTime(elapsed)}`);
+        console.log(`║ 📊 Progresso: ${savedItems.length}/${maxResults} (${Math.round(savedItems.length/maxResults*100)}%)`);
+        console.log(`╚════════════════════════════════════════╝\n`);
+      }
+
+      // Se encontrou novos itens, resetar contador
+      if (foundNewInThisRound) {
+        consecutiveNoNew = 0;
+      } else {
+        consecutiveNoNew++;
+      }
+
+      // Se atingiu o limite, parar
+      if (savedItems.length >= maxResults) {
+        break;
+      }
+
+      // Se não encontrou novos itens por muito tempo, parar
+      if (consecutiveNoNew >= MAX_NO_NEW) {
+        const elapsed = Date.now() - startTime;
+        console.log(`\n⚠️  PARANDO: ${consecutiveNoNew} tentativas sem novos leads`);
+        console.log(`⏱️  Tempo total: ${formatElapsedTime(elapsed)}`);
+        break;
+      }
+
+      // =============================
+      // SCROLL PARA CARREGAR MAIS
+      // =============================
+      const elapsed = Date.now() - startTime;
+      console.log(`🔄 Scroll #${totalScrolls + 1} - Carregando mais leads... (${formatElapsedTime(elapsed)})`);
+      
+      const beforeScroll = wrapper.scrollTop;
+      wrapper.scrollBy(0, SCROLL_DISTANCE);
+      const afterScroll = wrapper.scrollTop;
+      
+      totalScrolls++;
+
+      // Verificar se conseguiu scrollar (não chegou no fim)
+      if (beforeScroll === afterScroll) {
+        console.log(`⚠️  FIM DA PÁGINA - Não há mais leads disponíveis`);
+        consecutiveNoNew++;
+      }
+
+      // Aguardar renderização
+      await new Promise(resolve => setTimeout(resolve, WAIT_AFTER_SCROLL));
+    }
+
+    const totalElapsed = Date.now() - startTime;
+    
+    console.log(`\n╔════════════════════════════════════════╗`);
+    console.log(`║     ✅ EXTRAÇÃO CONCLUÍDA COM SUCESSO ║`);
+    console.log(`╠════════════════════════════════════════╣`);
+    console.log(`║ 💾 Leads salvos: ${savedItems.length}/${maxResults}`);
+    console.log(`║ ⏱️  Tempo total: ${formatElapsedTime(totalElapsed)}`);
+    console.log(`║ 🔄 Scrolls: ${totalScrolls}`);
+    console.log(`║ 🔍 Processados: ${processedCount}`);
+    console.log(`║ 📞 Com telefone: ${savedItems.filter(i => i.telefone).length}`);
+    console.log(`║ 🌐 Com website: ${savedItems.filter(i => i.website).length}`);
+    console.log(`╚════════════════════════════════════════╝\n`);
+
+    return {
+      items: savedItems,
+      stats: {
+        extracted: savedItems.length,
+        scrolls: totalScrolls,
+        processed: processedCount,
+        duration: totalElapsed
+      }
+    };
+  }, { maxResults, startTime: startTimestamp });
 }
 
 // =============================
@@ -395,13 +435,18 @@ async function scrapeGoogleMaps(profissao, local, maxResults = CONFIG.MAX_RESULT
       console.log('✅ Resultados detectados!');
       await new Promise(resolve => setTimeout(resolve, CONFIG.SCROLL.INITIAL_WAIT));
 
-      console.log('🔷 [5/6] Fazendo scroll AGRESSIVO para carregar MÁXIMO de resultados...');
-      await autoScrollLimited(page, maxResults);
+      console.log('🔷 [5/6] Extraindo dados ITEM POR ITEM...');
+      const extractionStartTime = Date.now();
+      const { items: rawResults, stats: extractionStats } = await extractOneByOne(page, maxResults);
+      const extractionDuration = ((Date.now() - extractionStartTime) / 1000).toFixed(2);
 
-      console.log('🔷 [6/6] Extraindo dados...');
-      const rawResults = await extractDataFromPage(page, maxResults);
-
-      console.log(`✅ Extraídos: ${rawResults.length} itens brutos`);
+      console.log(`\n═══════════════════════════════════════`);
+      console.log(`✅ Extração finalizada!`);
+      console.log(`📊 Itens extraídos: ${rawResults.length}`);
+      console.log(`⏱️  Tempo de extração: ${extractionDuration}s`);
+      console.log(`🔄 Total de scrolls: ${extractionStats.scrolls}`);
+      console.log(`🔍 Total processado: ${extractionStats.processed}`);
+      console.log(`═══════════════════════════════════════\n`);
 
       const filterConfig = FILTER_CONFIGS[CONFIG.FILTER_MODE];
       const filteredResults = rawResults.filter(filterConfig.validate);
@@ -417,7 +462,8 @@ async function scrapeGoogleMaps(profissao, local, maxResults = CONFIG.MAX_RESULT
         withAddress: rawResults.filter(r => r.endereco).length,
         validAfterFilter: filteredResults.length,
         returned: finalResults.length,
-        retries: retries
+        retries: retries,
+        scrolls: extractionStats.scrolls
       };
 
       console.log(`📊 Estatísticas: ${stats.withPhone} telefones | ${stats.withWebsite} websites | ${stats.withAddress} endereços`);
